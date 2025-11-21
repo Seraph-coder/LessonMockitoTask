@@ -42,14 +42,15 @@ public class ShoppingServiceTest {
 
     /**
      * Проверка получения покупателем более чем одной корзины
-     * Ожидаемое поведение: при повторном вызове метода возвращается новая корзина
+     * Ожидаемое поведение: при повторном вызове метода с тем же покупателем
+     * будет выдана та же (уже созданная) корзина
      */
     @Test
     public void testGetMultipleCartsForCustomer() {
         Cart cart1 = shoppingService.getCart(customer);
         Cart cart2 = shoppingService.getCart(customer);
 
-        Assertions.assertNotSame(cart1, cart2);
+        Assertions.assertSame(cart1, cart2);
     }
 
     /**
