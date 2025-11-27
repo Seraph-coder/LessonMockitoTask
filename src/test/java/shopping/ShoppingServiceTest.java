@@ -11,7 +11,7 @@ import product.Product;
 import product.ProductDao;
 
 /**
- * Тесты для сервиса покупок.
+ * Тесты для сервиса покупок {@link ShoppingService}.
  *
  * @author Seraph-coder
  * @since 14.11.2025
@@ -30,28 +30,21 @@ public class ShoppingServiceTest {
 
     /**
      * Проверка получения корзины для покупателя
-     * Ожидаемое поведение: всегда возвращается корзина, связанная с указанным покупателем
+     * Ожидаемое поведение: всегда возвращается корзина, связанная с указанным покупателем,
+     * при повторном вызове возвращается та же корзина
      */
     @Test
     public void testGetCard() {
-
-        Cart cart = shoppingService.getCart(customer);
-
-        Assertions.assertNotNull(cart);
-    }
-
-    /**
-     * Проверка получения покупателем более чем одной корзины
-     * Ожидаемое поведение: при повторном вызове метода с тем же покупателем
-     * будет выдана та же (уже созданная) корзина
-     */
-    @Test
-    public void testGetMultipleCartsForCustomer() {
         Cart cart1 = shoppingService.getCart(customer);
+        Product product = new Product("Какой то продукт", 10);
+        cart1.add(product, 2);
         Cart cart2 = shoppingService.getCart(customer);
-
+        Assertions.assertEquals(1, cart1.getProducts().size());
+        Assertions.assertEquals(2, cart1.getProducts().get(product));
+        Assertions.assertEquals(1, cart2.getProducts().size());
         Assertions.assertSame(cart1, cart2);
     }
+
 
     /**
      * Я считаю, что этот тест излишен, так как тестируемый метод просто делегирует вызов DAO слою.
@@ -76,7 +69,7 @@ public class ShoppingServiceTest {
     /**
      * Проверка успешной покупки продукта
      * Ожидаемое поведение: покупка совершается успешно, возвращается true, результат сохраняется в DAO,
-     * количество продукта уменьшается на купленное количество
+     * количество продукта уменьшается на купленное количество, корзина очищается
      */
     @Test
     public void testBuyProductSuccessfully() throws BuyException {
@@ -88,6 +81,7 @@ public class ShoppingServiceTest {
         Assertions.assertTrue(shoppingService.buy(cart));
         Mockito.verify(productDaoMock, Mockito.times(1)).save(product);
         Assertions.assertEquals(8, product.getCount());
+        Assertions.assertEquals(0, cart.getProducts().size());
     }
 
     /**
@@ -108,7 +102,7 @@ public class ShoppingServiceTest {
 
     /**
      * Проверка покупки с недостаточным количеством продукта
-     * Ожидаемое поведение: выбрасывается исключение BuyException, покупка не совершается
+     * Ожидаемое поведение: выбрасывается исключение при добавлении в корзину
      */
     @Test
     public void testBuyProductWithInsufficientStock() {
@@ -131,6 +125,46 @@ public class ShoppingServiceTest {
         Cart cart = shoppingService.getCart(customer);
 
         Assertions.assertFalse(shoppingService.buy(cart));
+        Mockito.verify(productDaoMock, Mockito.never()).save(Mockito.any());
+    }
+
+    /**
+     * Проверка успешной покупки с несколькими продуктами
+     * Ожидаемое поведение: покупка совершается успешно, возвращается true,
+     * каждый продукт сохраняется в DAO, количество каждого продукта уменьшается на купленное количество,
+     * корзина очищается
+     */
+    @Test
+    public void testBuyWithMultipleProductsSavesEachProduct() throws BuyException {
+        Cart cart = shoppingService.getCart(customer);
+        Product p1 = new Product("P1", 10);
+        Product p2 = new Product("P2", 7);
+
+        cart.add(p1, 3);
+        cart.add(p2, 2);
+
+        Assertions.assertTrue(shoppingService.buy(cart));
+
+        Assertions.assertEquals(7, p1.getCount());
+        Assertions.assertEquals(5, p2.getCount());
+
+        Mockito.verify(productDaoMock, Mockito.times(1)).save(p1);
+        Mockito.verify(productDaoMock, Mockito.times(1)).save(p2);
+        Assertions.assertTrue(cart.getProducts().isEmpty());
+    }
+
+    /**
+     * Проверка покупки, когда количество продукта уменьшается после добавления в корзину
+     * Ожидаемое поведение: выбрасывается исключение BuyException, изменения не сохраняются в DAO
+     */
+    @Test
+    public void testBuyThrowsWhenStockReducedAfterAdd() {
+        Cart cart = shoppingService.getCart(customer);
+        Product p = new Product("Race", 5);
+        cart.add(p, 4);
+        p.subtractCount(2);
+
+        Assertions.assertThrows(BuyException.class, () -> shoppingService.buy(cart));
         Mockito.verify(productDaoMock, Mockito.never()).save(Mockito.any());
     }
 }
